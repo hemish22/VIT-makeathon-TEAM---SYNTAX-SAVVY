@@ -133,7 +133,7 @@ function confirmDelete() {
 }
 
 // Message Handling
-function sendMessage() {
+async function sendMessage() {
     const userInput = document.getElementById('userInput');
     const messageText = userInput.value.trim();
     
@@ -142,34 +142,53 @@ function sendMessage() {
     const chats = JSON.parse(localStorage.getItem('chats'));
     const chatIndex = chats.findIndex(c => c.id === currentChatId);
     
-    // User message
-    chats[chatIndex].messages.push({
-        text: messageText,
-        sender: 'user-message',
-        timestamp: new Date().toISOString()
-    });
-    
-    // Bot response
-    chats[chatIndex].messages.push({
-        text: 'This is a dummy bot response',
-        sender: 'bot-message',
-        timestamp: new Date().toISOString()
-    });
-    
-    localStorage.setItem('chats', JSON.stringify(chats));
-    
-    // Update UI
+    // Add user message to UI
     const chatContainer = document.getElementById('chatContainer');
-    
     const userMessageDiv = document.createElement('div');
     userMessageDiv.className = 'message user-message';
     userMessageDiv.textContent = messageText;
     chatContainer.appendChild(userMessageDiv);
     
-    const botMessageDiv = document.createElement('div');
-    botMessageDiv.className = 'message bot-message';
-    botMessageDiv.textContent = 'This is a dummy bot response';
-    chatContainer.appendChild(botMessageDiv);
+    // Save user message to LocalStorage
+    chats[chatIndex].messages.push({
+        text: messageText,
+        sender: 'user-message',
+        timestamp: new Date().toISOString()
+    });
+    localStorage.setItem('chats', JSON.stringify(chats));
+    
+    // Send message to backend and get bot response
+    try {
+        const response = await fetch('http://127.0.0.1:5000/chat', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ query: messageText }),
+        });
+        
+        const data = await response.json();
+        
+        // Add bot response to UI
+        const botMessageDiv = document.createElement('div');
+        botMessageDiv.className = 'message bot-message';
+        botMessageDiv.textContent = data.response;
+        chatContainer.appendChild(botMessageDiv);
+        
+        // Save bot response to LocalStorage
+        chats[chatIndex].messages.push({
+            text: data.response,
+            sender: 'bot-message',
+            timestamp: new Date().toISOString()
+        });
+        localStorage.setItem('chats', JSON.stringify(chats));
+    } catch (error) {
+        console.error('Error:', error);
+        const errorMessageDiv = document.createElement('div');
+        errorMessageDiv.className = 'message bot-message';
+        errorMessageDiv.textContent = 'Error: Could not get a response from the bot.';
+        chatContainer.appendChild(errorMessageDiv);
+    }
     
     userInput.value = '';
     chatContainer.scrollTop = chatContainer.scrollHeight;
